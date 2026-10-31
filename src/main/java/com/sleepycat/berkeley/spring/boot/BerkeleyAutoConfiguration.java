@@ -96,6 +96,7 @@ public class BerkeleyAutoConfiguration implements InitializingBean, ResourceLoad
 
         System.out.println(catalogDatabase.getDatabaseName());
 
+        this.catalogDatabase = catalogDatabase;
         return catalogDatabase;
 
     }
@@ -126,6 +127,7 @@ public class BerkeleyAutoConfiguration implements InitializingBean, ResourceLoad
 
         System.out.println(myDatabase.getDatabaseName());
 
+        this.myDatabase = myDatabase;
         return myDatabase;
 
     }
