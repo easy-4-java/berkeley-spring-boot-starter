@@ -161,10 +161,12 @@ public class BerkeleyTemplate {
         List<String> list = myDbEnvironment.getDatabaseNames();//取得当前环境下数据库名称列表
         System.out.println(list);
 
-        env.renameDatabase(null, databaseName, "newName");//给数据库改名
-        env.removeDatabase(null, databaseName);//删除当前环境数据库
-
-        long deleteNum = env.truncateDatabase(null, databaseName, true);//清空数据库中所有记录，并返回数量
+        // JE requires the handle to be closed before truncation. Reopen it so
+        // this template remains usable after clearing the records.
+        com.sleepycat.je.DatabaseConfig config = myDatabase.getConfig();
+        myDatabase.close();
+        long deleteNum = env.truncateDatabase(null, databaseName, true);
+        myDatabase = env.openDatabase(null, databaseName, config);
         System.out.println(deleteNum);
 
 
