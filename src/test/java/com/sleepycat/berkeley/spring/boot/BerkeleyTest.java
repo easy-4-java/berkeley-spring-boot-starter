@@ -1,9 +1,13 @@
 package com.sleepycat.berkeley.spring.boot;
 
+import com.sleepycat.je.Cursor;
 import com.sleepycat.je.Database;
+import com.sleepycat.je.DatabaseEntry;
 import com.sleepycat.je.DatabaseConfig;
 import com.sleepycat.je.Environment;
 import com.sleepycat.je.EnvironmentConfig;
+import com.sleepycat.je.LockMode;
+import com.sleepycat.je.Transaction;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -12,6 +16,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.nio.file.Path;
 import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -89,5 +95,35 @@ class BerkeleyTest {
         template.setDatabase(database);
         template.writeToDatabase("after-failure", "valid", true);
         assertEquals("valid", template.readFromDatabase("after-failure"));
+    }
+    @Test
+    void partialClearFailureRollsBackEarlierDelete() {
+        template.writeToDatabase("first", "one", true);
+        template.writeToDatabase("second", "two", true);
+        Database observed = spy(database);
+        AtomicInteger reads = new AtomicInteger();
+        AtomicReference<Cursor> usedCursor = new AtomicReference<>();
+        doAnswer(open -> {
+            Cursor watched = spy((Cursor) open.callRealMethod());
+            doAnswer(next -> {
+                if (reads.incrementAndGet() == 2) {
+                    throw new IllegalStateException("injected after first delete");
+                }
+                return next.callRealMethod();
+            }).when(watched).getNext(any(DatabaseEntry.class), any(DatabaseEntry.class), eq(LockMode.DEFAULT));
+            usedCursor.set(watched);
+            return watched;
+        }).when(observed).openCursor(any(Transaction.class), isNull());
+        template.setDatabase(observed);
+
+        assertThrows(IllegalStateException.class, () -> template.otherMethod());
+        assertEquals(2, reads.get());
+        verify(usedCursor.get()).delete();
+        assertSame(observed, template.getDatabase());
+        template.setDatabase(database);
+        assertEquals("one", template.readFromDatabase("first"));
+        assertEquals("two", template.readFromDatabase("second"));
+        template.writeToDatabase("after", "three", true);
+        assertEquals("three", template.readFromDatabase("after"));
     }
 }
