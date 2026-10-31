@@ -29,6 +29,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 class BerkeleyTest {
     @TempDir Path home;
@@ -40,6 +41,7 @@ class BerkeleyTest {
     void openDatabase() {
         EnvironmentConfig envConfig = new EnvironmentConfig();
         envConfig.setAllowCreate(true);
+        envConfig.setConfigParam("je.freeDisk", "0");
         envConfig.setTransactional(true);
         environment = new Environment(home.toFile(), envConfig);
         DatabaseConfig dbConfig = new DatabaseConfig();
@@ -80,12 +82,27 @@ class BerkeleyTest {
 
 
     @Test
-    void truncatesAndReopensTheDatabase() {
+    void clearsAllRecordsWithoutReplacingSharedHandle() {
         template.writeToDatabase("keep", "before", true);
+        template.writeToDatabase("second", "before", true);
         template.otherMethod();
-        database = template.getDatabase();
+        assertSame(database, template.getDatabase());
         assertEquals("", template.readFromDatabase("keep"));
+        assertEquals("", template.readFromDatabase("second"));
         template.writeToDatabase("after", "value", true);
         assertEquals("value", template.readFromDatabase("after"));
+    }
+    @Test
+    void failedClearLeavesTheSharedHandleUntouched() {
+        Database failing = mock(Database.class);
+        when(failing.getDatabaseName()).thenReturn("items");
+        when(failing.getEnvironment()).thenReturn(environment);
+        when(failing.openCursor(any(com.sleepycat.je.Transaction.class), isNull())).thenThrow(new IllegalStateException("cursor unavailable"));
+        template.setDatabase(failing);
+        assertThrows(IllegalStateException.class, () -> template.otherMethod());
+        assertSame(failing, template.getDatabase());
+        template.setDatabase(database);
+        template.writeToDatabase("after-failure", "valid", true);
+        assertEquals("valid", template.readFromDatabase("after-failure"));
     }
 }
