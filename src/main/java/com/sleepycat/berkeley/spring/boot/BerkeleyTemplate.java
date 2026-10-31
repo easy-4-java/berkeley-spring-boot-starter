@@ -161,12 +161,34 @@ public class BerkeleyTemplate {
         List<String> list = myDbEnvironment.getDatabaseNames();//取得当前环境下数据库名称列表
         System.out.println(list);
 
-        // JE cannot truncate a database while its handle is open. Keep the
-        // template usable by reopening the same database after truncation.
-        com.sleepycat.je.DatabaseConfig config = myDatabase.getConfig();
-        myDatabase.close();
-        long deleteNum = env.truncateDatabase(null, databaseName, true);
-        myDatabase = env.openDatabase(null, databaseName, config);
+        // Delete in a transaction while keeping the shared Database handle open.
+        Transaction txn = env.beginTransaction(null, null);
+        Cursor cursor = null;
+        long deleteNum = 0;
+        boolean committed = false;
+        try {
+            cursor = myDatabase.openCursor(txn, null);
+            DatabaseEntry key = new DatabaseEntry();
+            DatabaseEntry value = new DatabaseEntry();
+            while (cursor.getNext(key, value, LockMode.DEFAULT) == OperationStatus.SUCCESS) {
+                cursor.delete();
+                deleteNum++;
+            }
+            cursor.close();
+            cursor = null;
+            txn.commit();
+            committed = true;
+        } finally {
+            try {
+                if (cursor != null) {
+                    cursor.close();
+                }
+            } finally {
+                if (!committed) {
+                    txn.abort();
+                }
+            }
+        }
         System.out.println(deleteNum);
 
 
