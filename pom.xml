@@ -60,6 +60,7 @@
                         <source>${java.version}</source>
                         <target>${java.version}</target>
                         <encoding>${project.build.sourceEncoding}</encoding>
+                        <proc>full</proc>
                         <maxmem>512M</maxmem>
                     </configuration>
                 </plugin>
@@ -168,7 +169,9 @@
                     <configuration>
                         
                         <forkMode>once</forkMode>
-                        <argLine>${argLine} -Xmx1024m -Dfile.encoding=UTF-8</argLine>
+                        <!-- Temporary JE databases run inside the test JVM; the
+                             host's free space must not gate isolated tests. -->
+                        <argLine>${argLine} -Xmx1024m -Dfile.encoding=UTF-8 -Dje.freeDisk=0</argLine>
                         <additionalClasspathElements>
                             <additionalClasspathElement>${basedir}/target/test-classes</additionalClasspathElement>
                         </additionalClasspathElements>
