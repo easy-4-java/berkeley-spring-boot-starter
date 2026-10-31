@@ -52,7 +52,8 @@ public class Cursor {
         }
 
         //向前遍历
-        while(myCursor.getPrev(databaseKey, databaseValue, LockMode.DEFAULT) == OperationStatus.SUCCESS){                 
+        myCursor.getFirst(databaseKey, databaseValue, LockMode.DEFAULT);
+        while(myCursor.getNext(databaseKey, databaseValue, LockMode.DEFAULT) == OperationStatus.SUCCESS){
             String theKey = new String(databaseKey.getData(), "UTF-8");               
             String theData = new String(databaseValue.getData(), "UTF-8");                
             System.out.println("Key: " + theKey + "Data: " + theData);                    
@@ -92,7 +93,7 @@ public class Cursor {
         DatabaseEntry databaseValue = new DatabaseEntry();
 
         OperationStatus res  = myCursor.getSearchKey(databaseKey, databaseValue, LockMode.DEFAULT);
-        if(myCursor.count() > 1){
+        if(res == OperationStatus.SUCCESS){
             while(res == OperationStatus.SUCCESS){
                 String foundKey = new String(databaseKey.getData(), "utf8");
                 String foundValue = new String(databaseValue.getData(), "utf8");
@@ -157,6 +158,7 @@ public class Cursor {
 
     public static void main(String[] args) throws UnsupportedEncodingException{
         Cursor cursor = new Cursor();
+        if (args.length > 0) cursor.envDir = args[0];
         cursor.configEnvironment();
         cursor.createDatabase();
         cursor.addDataByCursor("a", "www.baidu.com");
